@@ -129,6 +129,12 @@ else
 LZ4_MSG := $(NO_LZ4_MSG)
 endif
 
+ifneq ($(ZSTD_OPENCL_SUPPORT), 0)
+OPENCLCPP = -I$(ZSTDDIR)/openclMgr -DZSTD_OPENCL
+OPENCLLD = $(shell aocl link-config) -L$(ZSTDDIR)/openclMgr -lzstdOpenclMgr
+CC = g++
+endif
+
 .PHONY: default
 default: zstd-release
 
@@ -140,8 +146,8 @@ allVariants: zstd zstd-compress zstd-decompress zstd-small zstd-nolegacy
 
 $(ZSTDDECOMP_O): CFLAGS += $(ALIGN_LOOP)
 
-zstd : CPPFLAGS += $(THREAD_CPP) $(ZLIBCPP) $(LZMACPP) $(LZ4CPP)
-zstd : LDFLAGS += $(THREAD_LD) $(ZLIBLD) $(LZMALD) $(LZ4LD)
+zstd : CPPFLAGS += $(THREAD_CPP) $(ZLIBCPP) $(LZMACPP) $(LZ4CPP) $(OPENCLCPP)
+zstd : LDFLAGS += $(THREAD_LD) $(ZLIBLD) $(LZMALD) $(LZ4LD) $(OPENCLLD)
 zstd : CPPFLAGS += -DZSTD_LEGACY_SUPPORT=$(ZSTD_LEGACY_SUPPORT)
 zstd : $(ZSTDLIB_FILES) zstdcli.o fileio.o bench.o datagen.o dibio.o
 	@echo "$(THREAD_MSG)"

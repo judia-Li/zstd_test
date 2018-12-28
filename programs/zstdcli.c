@@ -39,7 +39,9 @@
 #endif
 #define ZSTD_STATIC_LINKING_ONLY   /* ZSTD_maxCLevel */
 #include "zstd.h"     /* ZSTD_VERSION_STRING */
-
+#ifdef ZSTD_OPENCL
+#include "zstd_opencl_mgr.h"
+#endif
 
 /*-************************************
 *  Constants
@@ -440,7 +442,9 @@ int main(int argCount, const char* argv[])
     if (exeNameMatch(programName, ZSTD_LZ4)) { suffix = LZ4_EXTENSION; FIO_setCompressionType(FIO_lz4Compression); }                                       /* behave like lz4 */
     if (exeNameMatch(programName, ZSTD_UNLZ4)) { operation=zom_decompress; FIO_setCompressionType(FIO_lz4Compression); }                                   /* behave like unlz4, also supports multiple formats */
     memset(&compressionParams, 0, sizeof(compressionParams));
-
+#ifdef ZSTD_OPENCL
+    createOpenCLComponents();
+#endif
     /* command switches */
     for (argNb=1; argNb<argCount; argNb++) {
         const char* argument = argv[argNb];
@@ -910,6 +914,9 @@ _end:
     if (extendedFileList)
         UTIL_freeFileList(extendedFileList, fileNamesBuf);
     else
+#endif
+#ifdef ZSTD_OPENCL
+	releaseOpenCLComponents();
 #endif
         free((void*)filenameTable);
     return operationResult;

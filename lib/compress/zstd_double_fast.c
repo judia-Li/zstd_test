@@ -10,8 +10,66 @@
 
 #include "zstd_compress_internal.h"
 #include "zstd_double_fast.h"
+#ifdef ZSTD_OPENCL
+#include <CL/opencl.h>
+#include "openclMgr/zstd_opencl_mgr.h"
+
+static U32* smHashIndexArray = NULL;
+static U32* lgHashIndexArray = NULL;
 
 
+void ZSTD_fillDoubleHashTable(ZSTD_matchState_t* ms,
+    ZSTD_compressionParameters const* cParams,
+    void const* end)
+{
+    U32* const hashLarge = ms->hashTable;
+    U32  const hBitsL = cParams->hashLog;
+    U32  const mls = cParams->searchLength;
+    U32* const hashSmall = ms->chainTable;
+    U32  const hBitsS = cParams->chainLog;
+    const BYTE* const base = ms->window.base;
+    const BYTE* ip = base + ms->nextToUpdate;
+    const BYTE* const iend = ((const BYTE*)end) - HASH_READ_SIZE;
+    const U32 fastHashFillStep = 3;
+
+    cl_uint nextToUpdateAddrVal = (cl_uint)(ms->nextToUpdate);
+    size_t ipSize = (size_t)(iend - ip) + 1;
+    size_t const hashSmallSize = ((size_t)1 << cParams->chainLog) * sizeof(U32);
+    size_t const hashLargeSize = ((size_t)1 << cParams->hashLog) * sizeof(U32);
+    size_t workItems = (iend - ip) / fastHashFillStep;
+
+	if (NULL == smHashIndexArray) {
+		smHashIndexArray = (U32*)calloc(workItems, sizeof(U32));
+	}
+	if (NULL == lgHashIndexArray) {
+		lgHashIndexArray = (U32*)calloc(workItems * fastHashFillStep, sizeof(U32));
+	}
+
+	ZSTD_fillDoubleHashTableCL(ipSize, ip, workItems, smHashIndexArray, workItems * fastHashFillStep, lgHashIndexArray);
+
+    /* fill hash table */
+    size_t iCount = 0;
+    for (iCount = 0; iCount < workItems; iCount++)
+    {
+        U32 const current = iCount * fastHashFillStep + ms->nextToUpdate;
+
+        /* hashSmall */
+        size_t smHash = smHashIndexArray[iCount];
+        hashSmall[smHash] = current;
+
+        /* hashLarge */
+		size_t jCount = 0;
+        for (jCount = 0; jCount < fastHashFillStep; jCount++)
+        {
+            size_t lgHash = lgHashIndexArray[iCount * fastHashFillStep + jCount];
+            if ((0 == jCount) || (0 == hashLarge[lgHash]))
+            {
+                hashLarge[lgHash] = current + jCount;
+            }
+        }
+    }
+}
+#else
 void ZSTD_fillDoubleHashTable(ZSTD_matchState_t* ms,
                               ZSTD_compressionParameters const* cParams,
                               void const* end)
@@ -43,7 +101,7 @@ void ZSTD_fillDoubleHashTable(ZSTD_matchState_t* ms,
         }
     }
 }
-
+#endif
 
 FORCE_INLINE_TEMPLATE
 size_t ZSTD_compressBlock_doubleFast_generic(

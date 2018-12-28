@@ -59,6 +59,14 @@ endif
 
 LIBZSTD = libzstd.$(SHARED_EXT_VER)
 
+ifneq ($(ZSTD_OPENCL_SUPPORT), 0)
+CPPFLAGS += -DZSTD_OPENCL
+LIBCLMGR = libzstdOpenclMgr.a
+
+$(LIBCLMGR):
+	@$(MAKE) -C openclMgr all
+
+endif
 
 .PHONY: default all clean install uninstall
 
@@ -92,7 +100,7 @@ libzstd : $(LIBZSTD)
 libzstd-mt : CPPFLAGS += -DZSTD_MULTITHREAD
 libzstd-mt : libzstd
 
-lib: libzstd.a libzstd
+lib: libzstd.a libzstd $(LIBCLMGR)
 
 lib-mt: CPPFLAGS += -DZSTD_MULTITHREAD
 lib-mt: lib
@@ -115,6 +123,7 @@ clean:
 	@$(RM) core *.o *.a *.gcda *.$(SHARED_EXT) *.$(SHARED_EXT).* libzstd.pc
 	@$(RM) dll/libzstd.dll dll/libzstd.lib libzstd-nomt*
 	@$(RM) common/*.o compress/*.o decompress/*.o dictBuilder/*.o legacy/*.o deprecated/*.o
+	@$(MAKE) -C openclMgr clean
 	@echo Cleaning library completed
 
 #-----------------------------------------------------------------------------
